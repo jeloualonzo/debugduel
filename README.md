@@ -34,6 +34,18 @@ solved a HARD are already at the perfect 15.
 4. **⧉ Copy all** → paste into NetBeans `Main.java` (Ctrl+A, Ctrl+V) → **Run**.
    The Output window is the judge: goal printed within the time = points.
 
+## Completed problems
+
+Every loaded problem is automatically marked **completed** — it can never be drawn
+again for another student. The **Completed Problems** section at the bottom shows all
+used numbers as chips in order (E01 … E40, H01 … H20); click the **×** on a chip to
+restore that problem to the pool (handy for the bonus round or a cancelled turn).
+`reset draws` in the header restores everything.
+
+State is saved in the browser's local storage, so a page refresh during the activity
+keeps your completed list — when running from a normal origin (the downloaded file
+opened locally, or GitHub Pages).
+
 ## Problem sets
 
 All 60 problems (40 easy · 20 hard) are embedded — every fixed version has been
