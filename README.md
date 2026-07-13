@@ -24,11 +24,11 @@ solved a HARD are already at the perfect 15.
 
 ## Flow
 
-1. Student clicks **EASY** or **HARD** → a roulette draws a random *unused* problem
-   (numbers never repeat; counters in the header, `reset draws` to clear).
-2. The problem loads into the editor — line numbers, light NetBeans-style theme,
-   **no error hints** (that's the point), with `package debugduel;` already on top
-   and the GOAL as a comment.
+1. Student clicks **EASY** or **HARD** → a random *unused* problem loads **instantly**
+   into the editor (numbers never repeat; counters in the header, `reset draws` to clear).
+2. The editor has line numbers and real **NetBeans-light syntax coloring** — keywords,
+   strings, comments, numbers — but **no error marking** (that's the point), with
+   `package debugduel;` already on top and the GOAL as a comment.
 3. Student fixes the code right there. Timer below (editable minutes, presets
    3:00 / 2:00 / 1:00 bonus, beeps at zero).
 4. **⧉ Copy all** → paste into NetBeans `Main.java` (Ctrl+A, Ctrl+V) → **Run**.
