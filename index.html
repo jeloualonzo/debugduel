@@ -174,6 +174,12 @@
     font-size:14px; line-height:1; padding:1px 6px; border-radius:999px; font-weight:700;
   }
   .chipDone button:hover{background:rgba(0,0,0,.1);}
+  #btnClearDone{
+    margin-left:auto; border:1px solid #f2c6c2; background:#fff; color:#9c2117;
+    border-radius:8px; font-size:11.5px; font-weight:700; padding:4px 10px; cursor:pointer;
+    text-transform:none; letter-spacing:0;
+  }
+  #btnClearDone:hover{background:#fdeaea;}
 
   footer{font-size:11.5px; color:var(--mut); text-align:center; padding-top:2px;}
 
@@ -260,7 +266,8 @@
   </section>
 
   <section class="doneWrap card">
-    <h2>Completed Problems <span class="pill2" id="doneCount">0</span></h2>
+    <h2>Completed Problems <span class="pill2" id="doneCount">0</span>
+      <button id="btnClearDone" hidden>× Remove all</button></h2>
     <div id="doneList"><span id="doneEmpty">No completed problems yet.</span></div>
   </section>
 
@@ -488,10 +495,21 @@ function restoreSid(sid){
   updateCounts();
   renderDone();
 }
+function clearAllDone(){
+  if(!used.size) return;
+  if(!confirm("Remove all " + used.size + " completed problems and return them to the pool?")) return;
+  used = new Set();
+  store.set("dd_used", []);
+  updateCounts();
+  renderDone();
+}
+$("btnClearDone").onclick = clearAllDone;
+
 function renderDone(){
   const list = $("doneList");
   const sids = [...used].filter(sid => problems.some(p => p.sid === sid)).sort((a, b) => sidOrder(a) - sidOrder(b));
   $("doneCount").textContent = sids.length;
+  $("btnClearDone").hidden = sids.length === 0;
   list.innerHTML = "";
   if(!sids.length){
     const s = document.createElement("span");
