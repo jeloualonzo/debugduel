@@ -109,10 +109,27 @@
     padding:10px 8px 10px 0; font:var(--edfont); overflow:hidden; user-select:none;
     border-right:1px solid #e3e7ec; flex-shrink:0; white-space:pre;
   }
-  #code{
-    flex:1; border:0; outline:none; resize:none; padding:10px 12px;
-    font:var(--edfont); color:#111; background:#fff; white-space:pre; overflow:auto;
+  .editorStack{position:relative; flex:1; overflow:hidden; background:#fff;}
+  #hlLayer, #code{
+    position:absolute; inset:0; margin:0; border:0; padding:10px 12px;
+    font:var(--edfont); white-space:pre; box-sizing:border-box;
+    font-variant-ligatures:none; letter-spacing:0; tab-size:4; text-align:left;
   }
+  #hlLayer{overflow:hidden; pointer-events:none; color:#111; background:transparent; z-index:1;}
+  #hlCode{font:inherit; white-space:pre;}
+  #code{
+    z-index:2; outline:none; resize:none; background:transparent;
+    color:transparent; -webkit-text-fill-color:transparent; caret-color:#111;
+    overflow:auto;
+  }
+  #code::selection{background:rgba(37,99,235,.25);}
+  /* NetBeans-light token colors (no error marking, by design) */
+  .tk-kw{color:#0033b3;}
+  .tk-str{color:#067d17;}
+  .tk-num{color:#1750eb;}
+  .tk-com{color:#8c8c8c; font-style:italic;}
+  .tk-mth{color:#00627a;}
+  .tk-fld{color:#871094; font-style:italic;}
   :root{--edfont:13.5px/1.5 Consolas,Menlo,"Courier New",monospace;}
 
   /* ---------- timer ---------- */
@@ -160,29 +177,6 @@
 
   footer{font-size:11.5px; color:var(--mut); text-align:center; padding-top:2px;}
 
-  /* ---------- modal ---------- */
-  #modal{
-    position:fixed; inset:0; background:rgba(15,23,42,.55); display:flex;
-    align-items:center; justify-content:center; z-index:50; padding:16px;
-  }
-  .mCard{
-    background:#fff; border-radius:16px; width:100%; max-width:430px;
-    padding:26px 24px 22px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.3);
-  }
-  .mTier{font-size:12px; font-weight:800; letter-spacing:1.5px;}
-  .mTier.E{color:var(--easy);} .mTier.H{color:var(--hard);}
-  #rollSid{
-    font:800 64px/1.1 Consolas,Menlo,monospace; color:var(--navy); margin:12px 0 6px;
-    letter-spacing:2px;
-  }
-  #rollSid.rolling{color:#8593a5;}
-  .mGoal{text-align:left; margin-top:10px;}
-  .mGoal b{font-size:11px; color:var(--mut); letter-spacing:.6px;}
-  .mGoal pre{
-    font:12.5px/1.5 Consolas,Menlo,monospace; background:#f6f8fa; border:1px solid var(--line);
-    border-radius:8px; padding:7px 10px; margin-top:4px; white-space:pre-wrap;
-  }
-  .mBtns{display:flex; gap:10px; margin-top:16px; justify-content:center;}
   [hidden]{display:none !important;}
 </style>
 </head>
@@ -240,7 +234,10 @@
     </div>
     <div class="editor">
       <div id="gutter">1</div>
-      <textarea id="code" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+      <div class="editorStack">
+        <pre id="hlLayer"><code id="hlCode"></code></pre>
+        <textarea id="code" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+      </div>
     </div>
   </section>
 
@@ -272,21 +269,6 @@
     (no error hints, like real paper) → <b>Copy all</b> → paste into NetBeans <b>Main.java</b> (Ctrl+A, Ctrl+V) → Run.
     The Output window is the judge. Click <b>×</b> on a completed chip to put that problem back in the pool.
   </footer>
-</div>
-
-<div id="modal" hidden>
-  <div class="mCard">
-    <div class="mTier" id="mTier">DRAWING…</div>
-    <div id="rollSid" class="rolling">· · ·</div>
-    <div class="mGoal" id="mGoalWrap" hidden>
-      <b>GOAL — MUST PRINT EXACTLY</b>
-      <pre id="mGoal"></pre>
-    </div>
-    <div class="mBtns" id="mBtns" hidden>
-      <button class="btn" id="btnLoad">▶ Load into editor</button>
-      <button class="btn gray" id="btnCancelDraw">Cancel</button>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -325,8 +307,95 @@ function compose(p){
 }
 
 /* ============================== editor ============================== */
-const ta = $("code"), gutter = $("gutter");
+const ta = $("code"), gutter = $("gutter"), hlLayer = $("hlLayer"), hlCode = $("hlCode");
 let edSize = 13.5;
+
+/* --- NetBeans-light syntax highlighting (colors only — no error marking) --- */
+const JKW = new Set(("abstract assert boolean break byte case catch char class const continue " +
+  "default do double else enum extends final finally float for goto if implements import " +
+  "instanceof int interface long native new package private protected public return short " +
+  "static strictfp super switch synchronized this throw throws transient try void volatile " +
+  "while var record true false null").split(" "));
+
+function escHtml(s){ return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function tokenizeLine(line, st){
+  let out = "", i = 0, prev = "";
+  const n = line.length;
+  const push = (txt, cls) => {
+    if(!txt) return;
+    out += cls ? '<span class="tk-' + cls + '">' + escHtml(txt) + "</span>" : escHtml(txt);
+  };
+  while(i < n){
+    const ch = line[i];
+    if(st.bc){
+      const end = line.indexOf("*/", i);
+      if(end === -1){ push(line.slice(i), "com"); i = n; }
+      else { push(line.slice(i, end + 2), "com"); i = end + 2; st.bc = false; }
+      continue;
+    }
+    if(line.startsWith("//", i)){ push(line.slice(i), "com"); break; }
+    if(line.startsWith("/*", i)){
+      const end = line.indexOf("*/", i + 2);
+      if(end === -1){ push(line.slice(i), "com"); st.bc = true; i = n; }
+      else { push(line.slice(i, end + 2), "com"); i = end + 2; }
+      continue;
+    }
+    if(ch === '"' || ch === "'"){
+      let j = i + 1;
+      while(j < n){
+        if(line[j] === "\\"){ j += 2; continue; }
+        if(line[j] === ch){ j++; break; }
+        j++;
+      }
+      push(line.slice(i, j), "str"); prev = ch; i = j; continue;
+    }
+    if(/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(line[i + 1] || ""))){
+      let j = i;
+      while(j < n && /[0-9._xXbBeE]/.test(line[j])) j++;
+      if(j < n && /[fFdDlL]/.test(line[j])) j++;
+      push(line.slice(i, j), "num"); prev = line[j - 1]; i = j; continue;
+    }
+    if(/[A-Za-z_$]/.test(ch)){
+      let j = i;
+      while(j < n && /[A-Za-z0-9_$]/.test(line[j])) j++;
+      const w = line.slice(i, j);
+      let k = j;
+      while(k < n && line[k] === " ") k++;
+      const nxt = line[k] || "";
+      let cls = null;
+      if(JKW.has(w)) cls = "kw";
+      else if(nxt === "(") cls = "mth";
+      else if(prev === "." && !/[A-Z]/.test(w[0])) cls = "fld";
+      push(w, cls); prev = w[w.length - 1]; i = j; continue;
+    }
+    let j = i;
+    while(j < n && !/[A-Za-z0-9_$"'\/]/.test(line[j])) j++;
+    if(j === i) j = i + 1;
+    const seg = line.slice(i, j);
+    push(seg, null);
+    const t = seg.trim();
+    if(t) prev = t[t.length - 1];
+    i = j;
+  }
+  return out;
+}
+
+function highlight(){
+  const lines = ta.value.split("\n");
+  const st = { bc: false };
+  let html = "";
+  for(let li = 0; li < lines.length; li++){
+    html += tokenizeLine(lines[li], st) + "\n";
+  }
+  hlCode.innerHTML = html;
+}
+
+function hlSync(){
+  hlLayer.scrollTop = ta.scrollTop;
+  hlLayer.scrollLeft = ta.scrollLeft;
+  gutter.scrollTop = ta.scrollTop;
+}
 
 function syncGutter(){
   const n = ta.value.split("\n").length;
@@ -335,15 +404,15 @@ function syncGutter(){
   gutter.textContent = s;
   gutter.scrollTop = ta.scrollTop;
 }
-ta.addEventListener("input", syncGutter);
-ta.addEventListener("scroll", () => { gutter.scrollTop = ta.scrollTop; });
+ta.addEventListener("input", () => { syncGutter(); highlight(); hlSync(); });
+ta.addEventListener("scroll", hlSync);
 ta.addEventListener("keydown", e => {
   if(e.key === "Tab"){
     e.preventDefault();
     const s = ta.selectionStart, epos = ta.selectionEnd;
     ta.value = ta.value.slice(0, s) + "    " + ta.value.slice(epos);
     ta.selectionStart = ta.selectionEnd = s + 4;
-    syncGutter();
+    syncGutter(); highlight(); hlSync();
   }
 });
 
@@ -368,72 +437,37 @@ $("btnCopy").onclick = async () => {
 };
 $("btnClear").onclick = () => {
   if(ta.value.trim() && !confirm("Clear the editor?")) return;
-  ta.value = ""; syncGutter();
+  ta.value = ""; syncGutter(); highlight(); hlSync();
 };
 
-/* ============================== drawing ============================== */
-let rollTimer = null, picked = null;
-
-function startDraw(tier){
+/* ============================== drawing (instant, no popup) ============================== */
+function draw(tier){
   const av = pool(tier);
   if(!av.length) return;
   if(ta.value.trim() && ta.value !== lastLoadedText &&
-     !confirm("The editor has unsaved edits. Draw a new problem anyway?")) return;
+     !confirm("The editor has unsaved edits. Load a new problem anyway?")) return;
 
-  picked = av[Math.floor(Math.random() * av.length)];
-  const m = $("modal"), roll = $("rollSid"), tierEl = $("mTier");
-  tierEl.textContent = "DRAWING " + tier + "…";
-  tierEl.className = "mTier " + tier[0];
-  roll.className = "rolling";
-  $("mGoalWrap").hidden = true; $("mBtns").hidden = true;
-  m.hidden = false;
-
-  const all = problems.filter(p => p.tier === tier).map(p => p.sid);
-  let elapsed = 0, delay = 55;
-  function spin(){
-    roll.textContent = all[Math.floor(Math.random() * all.length)];
-    elapsed += delay;
-    delay = Math.round(delay * 1.13);
-    if(elapsed < 1900){ rollTimer = setTimeout(spin, delay); }
-    else { reveal(); }
-  }
-  spin();
-}
-
-function reveal(){
-  const roll = $("rollSid");
-  roll.textContent = picked.sid;
-  roll.className = "";
-  $("mTier").textContent = picked.sid + "  ·  " + picked.tier +
-      (picked.tier === "EASY" ? "  ·  12 points · 2:00" : "  ·  15 points · 3:00");
-  $("mGoal").textContent = picked.goal;
-  $("mGoalWrap").hidden = false;
-  $("mBtns").hidden = false;
-}
-
-$("btnEasy").onclick = () => startDraw("EASY");
-$("btnHard").onclick = () => startDraw("HARD");
-$("btnCancelDraw").onclick = () => { clearTimeout(rollTimer); $("modal").hidden = true; };
-
-$("btnLoad").onclick = () => {
-  $("modal").hidden = true;
-  current = picked;
-  used.add(current.sid);
+  const p = av[Math.floor(Math.random() * av.length)];
+  current = p;
+  used.add(p.sid);
   store.set("dd_used", [...used]);
   updateCounts();
   renderDone();
 
-  ta.value = lastLoadedText = compose(current);
-  syncGutter();
-  ta.scrollTop = 0;
+  ta.value = lastLoadedText = compose(p);
+  syncGutter(); highlight();
+  ta.scrollTop = 0; ta.scrollLeft = 0;
+  hlSync();
 
-  $("probBadge").textContent = current.sid + " · " + current.tier;
-  $("probBadge").className = "badge " + current.tier[0];
-  $("probGoal").textContent = current.goal;
+  $("probBadge").textContent = p.sid + " · " + p.tier;
+  $("probBadge").className = "badge " + p.tier[0];
+  $("probGoal").textContent = p.goal;
   $("probBar").hidden = false;
 
-  setMinutes(current.tier === "HARD" ? 3 : 2);
-};
+  setMinutes(p.tier === "HARD" ? 3 : 2);
+}
+$("btnEasy").onclick = () => draw("EASY");
+$("btnHard").onclick = () => draw("HARD");
 
 $("btnResetDraws").onclick = () => {
   if(!confirm("Clear the completed list? All " + problems.length + " problems become available again.")) return;
@@ -592,6 +626,7 @@ document.querySelectorAll(".chip").forEach(c => c.onclick = () => setMinutes(par
 updateCounts();
 renderDone();
 syncGutter();
+highlight();
 paintTime();
 </script>
 </body>
