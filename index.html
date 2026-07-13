@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Debug Duel — Classroom Console</title>
+<style>
+  :root{
+    --navy:#1f3a5f; --blue:#2563eb; --easy:#1e8e3e; --hard:#b3261e;
+    --ink:#1c2430; --mut:#5b6572; --line:#d7dde6; --bg:#f2f5f9; --card:#ffffff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    background:var(--bg); color:var(--ink);
+    display:flex; flex-direction:column; align-items:center;
+    padding:14px 14px 26px;
+  }
+  .app{width:100%; max-width:880px; display:flex; flex-direction:column; gap:12px;}
+
+  /* ---------- header ---------- */
+  header{
+    background:var(--navy); color:#fff; border-radius:12px;
+    padding:12px 16px; display:flex; flex-wrap:wrap; gap:10px;
+    align-items:center; justify-content:space-between;
+  }
+  header h1{font-size:20px; letter-spacing:.3px;}
+  header .sub{font-size:11.5px; opacity:.75;}
+  .hdrRight{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .pill{font-size:11.5px; font-weight:600; padding:4px 10px; border-radius:999px; background:rgba(255,255,255,.12);}
+  .pill b{font-size:13px;}
+  .ghost{
+    background:transparent; border:1px solid rgba(255,255,255,.35); color:#fff;
+    border-radius:8px; padding:4px 10px; font-size:11.5px; cursor:pointer;
+  }
+  .ghost:hover{background:rgba(255,255,255,.12);}
+
+  /* ---------- cards ---------- */
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,.05);}
+
+  /* ---------- import ---------- */
+  #importPanel{padding:14px 16px; display:flex; flex-direction:column; gap:8px;}
+  #importPanel p{font-size:12.5px; color:var(--mut);}
+  #importText{
+    width:100%; height:140px; resize:vertical; font:12px/1.45 Consolas,Menlo,monospace;
+    border:1px solid var(--line); border-radius:8px; padding:8px; background:#fafbfc;
+  }
+  .btn{
+    border:0; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600;
+    cursor:pointer; background:var(--navy); color:#fff;
+  }
+  .btn:hover{filter:brightness(1.1);}
+  .btn.gray{background:#e7ebf0; color:var(--ink);}
+  #importMsg{font-size:12px; color:var(--easy); font-weight:600;}
+
+  /* ---------- draw buttons ---------- */
+  .drawRow{display:flex; gap:12px;}
+  .big{
+    flex:1; border:0; border-radius:14px; color:#fff; cursor:pointer;
+    padding:18px 10px 15px; text-align:center; font-weight:800; font-size:30px;
+    letter-spacing:1px; box-shadow:0 2px 6px rgba(16,24,40,.18);
+    transition:transform .06s ease;
+  }
+  .big:active{transform:scale(.98);}
+  .big small{display:block; font-size:12px; font-weight:600; letter-spacing:.2px; margin-top:4px; opacity:.92;}
+  .big.easy{background:linear-gradient(180deg,#22a04a,#177a37);}
+  .big.hard{background:linear-gradient(180deg,#c93a2c,#9c2117);}
+  .big:disabled{opacity:.45; cursor:not-allowed;}
+
+  /* ---------- problem bar ---------- */
+  .probBar{padding:10px 14px; display:flex; gap:12px; align-items:flex-start;}
+  .badge{
+    font:700 14px/1 Consolas,Menlo,monospace; color:#fff; border-radius:8px;
+    padding:8px 10px; white-space:nowrap;
+  }
+  .badge.E{background:var(--easy);} .badge.H{background:var(--hard);}
+  .goal{flex:1; min-width:0;}
+  .goal b{font-size:11px; letter-spacing:.6px; color:var(--mut); text-transform:uppercase;}
+  .goal pre{
+    font:12.5px/1.5 Consolas,Menlo,monospace; background:#f6f8fa; border:1px solid var(--line);
+    border-radius:8px; padding:6px 10px; margin-top:4px; white-space:pre-wrap;
+  }
+
+  /* ---------- editor ---------- */
+  .edHeader{
+    display:flex; justify-content:space-between; align-items:center;
+    background:#e9edf2; border:1px solid var(--line); border-bottom:0;
+    border-radius:12px 12px 0 0; padding:6px 8px 0 8px;
+  }
+  .tab{
+    background:#fff; border:1px solid var(--line); border-bottom:1px solid #fff;
+    border-radius:7px 7px 0 0; font:12px Consolas,Menlo,monospace; color:#3a4657;
+    padding:6px 14px; position:relative; top:1px;
+  }
+  .edBtns{display:flex; gap:6px; padding-bottom:5px;}
+  .mini{
+    border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:7px;
+    font-size:12px; font-weight:600; padding:5px 10px; cursor:pointer;
+  }
+  .mini:hover{background:#f2f5f9;}
+  .mini.primary{background:var(--blue); border-color:var(--blue); color:#fff;}
+  .editor{
+    display:flex; border:1px solid var(--line); border-radius:0 0 12px 12px;
+    background:#fff; height:340px; overflow:hidden;
+  }
+  #gutter{
+    width:46px; background:#f0f2f5; color:#9aa4b0; text-align:right;
+    padding:10px 8px 10px 0; font:var(--edfont); overflow:hidden; user-select:none;
+    border-right:1px solid #e3e7ec; flex-shrink:0; white-space:pre;
+  }
+  #code{
+    flex:1; border:0; outline:none; resize:none; padding:10px 12px;
+    font:var(--edfont); color:#111; background:#fff; white-space:pre; overflow:auto;
+  }
+  :root{--edfont:13.5px/1.5 Consolas,Menlo,"Courier New",monospace;}
+
+  /* ---------- timer ---------- */
+  .timerRow{display:flex; gap:14px; align-items:center; padding:12px 16px; flex-wrap:wrap;}
+  #timeDisp{
+    font:800 54px/1 Consolas,Menlo,monospace; color:var(--navy);
+    min-width:170px; text-align:center; border-radius:12px; padding:8px 12px;
+    background:#eef2f7; letter-spacing:2px;
+  }
+  #timeDisp.warn{color:#b26a00; background:#fdf3e0;}
+  #timeDisp.danger{color:#b3261e; background:#fdeaea; animation:pulse 1s infinite;}
+  @keyframes pulse{50%{opacity:.55;}}
+  .timerCtrl{display:flex; flex-direction:column; gap:8px; flex:1; min-width:230px;}
+  .tRow{display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:13px;}
+  #minInput{width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; font-size:14px;}
+  .chip{
+    border:1px solid var(--line); background:#fff; border-radius:999px; padding:5px 12px;
+    font-size:12px; font-weight:700; cursor:pointer; color:var(--navy);
+  }
+  .chip:hover{background:#eef2f7;}
+  .btnStart{background:var(--easy); color:#fff; border:0; border-radius:9px; padding:9px 20px; font-size:15px; font-weight:800; cursor:pointer;}
+  .btnStart:hover{filter:brightness(1.08);}
+
+  footer{font-size:11.5px; color:var(--mut); text-align:center; padding-top:2px;}
+
+  /* ---------- modal ---------- */
+  #modal{
+    position:fixed; inset:0; background:rgba(15,23,42,.55); display:flex;
+    align-items:center; justify-content:center; z-index:50; padding:16px;
+  }
+  .mCard{
+    background:#fff; border-radius:16px; width:100%; max-width:430px;
+    padding:26px 24px 22px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.3);
+  }
+  .mTier{font-size:12px; font-weight:800; letter-spacing:1.5px;}
+  .mTier.E{color:var(--easy);} .mTier.H{color:var(--hard);}
+  #rollSid{
+    font:800 64px/1.1 Consolas,Menlo,monospace; color:var(--navy); margin:12px 0 6px;
+    letter-spacing:2px;
+  }
+  #rollSid.rolling{color:#8593a5;}
+  .mGoal{text-align:left; margin-top:10px;}
+  .mGoal b{font-size:11px; color:var(--mut); letter-spacing:.6px;}
+  .mGoal pre{
+    font:12.5px/1.5 Consolas,Menlo,monospace; background:#f6f8fa; border:1px solid var(--line);
+    border-radius:8px; padding:7px 10px; margin-top:4px; white-space:pre-wrap;
+  }
+  .mBtns{display:flex; gap:10px; margin-top:16px; justify-content:center;}
+  [hidden]{display:none !important;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <h1>🐞 Debug Duel</h1>
+      <div class="sub">one-laptop classroom console — draw · edit · time</div>
+    </div>
+    <div class="hdrRight">
+      <span class="pill">EASY left <b id="cntE">–</b></span>
+      <span class="pill">HARD left <b id="cntH">–</b></span>
+      <button class="ghost" id="btnResetDraws" title="Clear the drawn-numbers memory">↺ reset draws</button>
+      <button class="ghost" id="btnImport">⇪ import</button>
+    </div>
+  </header>
+
+  <section id="importPanel" class="card" hidden>
+    <p><b>Import a problem set.</b> Paste the <i>entire</i> master file
+    (e.g. DebugDuel_60_BrokenPrograms.java) below — every numbered block is read
+    automatically (its number, EASY/HARD, GOAL, and code). Loading replaces the current
+    set and clears drawn numbers.</p>
+    <textarea id="importText" spellcheck="false" placeholder="// paste the whole master file here…"></textarea>
+    <div class="tRow">
+      <button class="btn" id="btnLoadImport">Load problems</button>
+      <button class="btn gray" id="btnCancelImport">Cancel</button>
+      <span id="importMsg"></span>
+    </div>
+  </section>
+
+  <section class="drawRow">
+    <button class="big easy" id="btnEasy">EASY<small>2 minutes · 12 points</small></button>
+    <button class="big hard" id="btnHard">HARD<small>3 minutes · 15 points</small></button>
+  </section>
+
+  <section class="probBar card" id="probBar" hidden>
+    <span class="badge" id="probBadge">—</span>
+    <div class="goal">
+      <b>Goal — must print exactly</b>
+      <pre id="probGoal"></pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="edHeader">
+      <span class="tab">Main.java</span>
+      <span class="edBtns">
+        <button class="mini primary" id="btnCopy">⧉ Copy all</button>
+        <button class="mini" id="btnClear">Clear</button>
+        <button class="mini" id="fontMinus">A−</button>
+        <button class="mini" id="fontPlus">A+</button>
+      </span>
+    </div>
+    <div class="editor">
+      <div id="gutter">1</div>
+      <textarea id="code" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+    </div>
+  </section>
+
+  <section class="timerRow card">
+    <div id="timeDisp">2:00</div>
+    <div class="timerCtrl">
+      <div class="tRow">
+        <label for="minInput">minutes:</label>
+        <input id="minInput" type="number" min="1" max="15" step="1" value="2">
+        <button class="chip" data-min="3">3:00 hard</button>
+        <button class="chip" data-min="2">2:00 easy</button>
+        <button class="chip" data-min="1">1:00 bonus</button>
+      </div>
+      <div class="tRow">
+        <button class="btnStart" id="btnStart">▶ Start</button>
+        <button class="mini" id="btnPause">Pause</button>
+        <button class="mini" id="btnTReset">Reset</button>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Flow: student clicks EASY or HARD → problem loads into the editor → student fixes it here (no error hints, like real paper)
+    → <b>Copy all</b> → paste into NetBeans <b>Main.java</b> (Ctrl+A, Ctrl+V) → Run. The Output window is the judge.
+  </footer>
+</div>
+
+<div id="modal" hidden>
+  <div class="mCard">
+    <div class="mTier" id="mTier">DRAWING…</div>
+    <div id="rollSid" class="rolling">· · ·</div>
+    <div class="mGoal" id="mGoalWrap" hidden>
+      <b>GOAL — MUST PRINT EXACTLY</b>
+      <pre id="mGoal"></pre>
+    </div>
+    <div class="mBtns" id="mBtns" hidden>
+      <button class="btn" id="btnLoad">▶ Load into editor</button>
+      <button class="btn gray" id="btnCancelDraw">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================== data ============================== */
+const BUILTIN = [{"sid": "E01", "tier": "EASY", "goal": "Coding is fun!", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Coding is fun!\")\n    }\n}"}, {"sid": "E02", "tier": "EASY", "goal": "Practice makes progress.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Practice makes progress.\")\n    }\n}"}, {"sid": "E03", "tier": "EASY", "goal": "Java says hi!", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Java says hi!\")\n    }\n}"}, {"sid": "E04", "tier": "EASY", "goal": "One line at a time.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"One line at a time.\")\n    }\n}"}, {"sid": "E05", "tier": "EASY", "goal": "87", "code": "public class Main {\n    public static void main(String[] args) {\n        int score = 87\n        System.out.println(score);\n    }\n}"}, {"sid": "E06", "tier": "EASY", "goal": "Bantay", "code": "public class Main {\n    public static void main(String[] args) {\n        String pet = \"Bantay\"\n        System.out.println(pet);\n    }\n}"}, {"sid": "E07", "tier": "EASY", "goal": "49.75", "code": "public class Main {\n    public static void main(String[] args) {\n        double price = 49.75\n        System.out.println(price);\n    }\n}"}, {"sid": "E08", "tier": "EASY", "goal": "Welcome to programming!", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.printIn(\"Welcome to programming!\");\n    }\n}"}, {"sid": "E09", "tier": "EASY", "goal": "Keep typing, keep learning.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.printIn(\"Keep typing, keep learning.\");\n    }\n}"}, {"sid": "E10", "tier": "EASY", "goal": "Hello from Java!", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.printIn(\"Hello from Java!\");\n    }\n}"}, {"sid": "E11", "tier": "EASY", "goal": "I fixed this program.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.printIn(\"I fixed this program.\");\n    }\n}"}, {"sid": "E12", "tier": "EASY", "goal": "I love coding.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(“I love coding.”);\n    }\n}"}, {"sid": "E13", "tier": "EASY", "goal": "Straight quotes only.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(“Straight quotes only.”);\n    }\n}"}, {"sid": "E14", "tier": "EASY", "goal": "Copy-paste with care.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(“Copy-paste with care.”);\n    }\n}"}, {"sid": "E15", "tier": "EASY", "goal": "Good morning!", "code": "public class Main {\n    public static void main(String[] args) {\n        system.out.println(\"Good morning!\");\n    }\n}"}, {"sid": "E16", "tier": "EASY", "goal": "Case matters in Java.", "code": "public class Main {\n    public static void main(String[] args) {\n        system.out.println(\"Case matters in Java.\");\n    }\n}"}, {"sid": "E17", "tier": "EASY", "goal": "Capital S, please.", "code": "public class Main {\n    public static void main(String[] args) {\n        system.out.println(\"Capital S, please.\");\n    }\n}"}, {"sid": "E18", "tier": "EASY", "goal": "Small letters matter.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.Println(\"Small letters matter.\");\n    }\n}"}, {"sid": "E19", "tier": "EASY", "goal": "Methods are lowercase.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.Println(\"Methods are lowercase.\");\n    }\n}"}, {"sid": "E20", "tier": "EASY", "goal": "Almost right is still wrong.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.Println(\"Almost right is still wrong.\");\n    }\n}"}, {"sid": "E21", "tier": "EASY", "goal": "Mabuhay", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(Mabuhay);\n    }\n}"}, {"sid": "E22", "tier": "EASY", "goal": "Salamat", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(Salamat);\n    }\n}"}, {"sid": "E23", "tier": "EASY", "goal": "Tara", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(Tara);\n    }\n}"}, {"sid": "E24", "tier": "EASY", "goal": "Ana", "code": "public class Main {\n    public static void main(String[] args) {\n        String name = 'Ana';\n        System.out.println(name);\n    }\n}"}, {"sid": "E25", "tier": "EASY", "goal": "Cebu", "code": "public class Main {\n    public static void main(String[] args) {\n        String city = 'Cebu';\n        System.out.println(city);\n    }\n}"}, {"sid": "E26", "tier": "EASY", "goal": "Java", "code": "public class Main {\n    public static void main(String[] args) {\n        String subject = 'Java';\n        System.out.println(subject);\n    }\n}"}, {"sid": "E27", "tier": "EASY", "goal": "A", "code": "public class Main {\n    public static void main(String[] args) {\n        char section = \"A\";\n        System.out.println(section);\n    }\n}"}, {"sid": "E28", "tier": "EASY", "goal": "B", "code": "public class Main {\n    public static void main(String[] args) {\n        char grade = \"B\";\n        System.out.println(grade);\n    }\n}"}, {"sid": "E29", "tier": "EASY", "goal": "R", "code": "public class Main {\n    public static void main(String[] args) {\n        char initial = \"R\";\n        System.out.println(initial);\n    }\n}"}, {"sid": "E30", "tier": "EASY", "goal": "95.5", "code": "public class Main {\n    public static void main(String[] args) {\n        int grade = 95.5;\n        System.out.println(grade);\n    }\n}"}, {"sid": "E31", "tier": "EASY", "goal": "1.65", "code": "public class Main {\n    public static void main(String[] args) {\n        int height = 1.65;\n        System.out.println(height);\n    }\n}"}, {"sid": "E32", "tier": "EASY", "goal": "88.25", "code": "public class Main {\n    public static void main(String[] args) {\n        int average = 88.25;\n        System.out.println(average);\n    }\n}"}, {"sid": "E33", "tier": "EASY", "goal": "true", "code": "public class Main {\n    public static void main(String[] args) {\n        boolean enrolled = True;\n        System.out.println(enrolled);\n    }\n}"}, {"sid": "E34", "tier": "EASY", "goal": "false", "code": "public class Main {\n    public static void main(String[] args) {\n        boolean absent = FALSE;\n        System.out.println(absent);\n    }\n}"}, {"sid": "E35", "tier": "EASY", "goal": "Hello Chris", "code": "public class Main {\n    public static void main(String[] args) {\n        String name = \"Chris\";\n        System.out.println(\"Hello \" name);\n    }\n}"}, {"sid": "E36", "tier": "EASY", "goal": "I love adobo", "code": "public class Main {\n    public static void main(String[] args) {\n        String food = \"adobo\";\n        System.out.println(\"I love \" food);\n    }\n}"}, {"sid": "E37", "tier": "EASY", "goal": "Course: ACT", "code": "public class Main {\n    public static void main(String[] args) {\n        String course = \"ACT\";\n        System.out.println(\"Course: \" course);\n    }\n}"}, {"sid": "E38", "tier": "EASY", "goal": "Mia", "code": "public class Main {\n    public static void main(String[] args) {\n        String first name = \"Mia\";\n        System.out.println(first name);\n    }\n}"}, {"sid": "E39", "tier": "EASY", "goal": "15", "code": "public class Main {\n    public static void main(String[] args) {\n        int quiz score = 15;\n        System.out.println(quiz score);\n    }\n}"}, {"sid": "E40", "tier": "EASY", "goal": "88", "code": "public class Main {\n    public static void main(String[] args) {\n        int 2ndScore = 88;\n        System.out.println(2ndScore);\n    }\n}"}, {"sid": "H01", "tier": "HARD", "goal": "Two bugs, one hunter.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.printIn(\"Two bugs, one hunter.\")\n    }\n}"}, {"sid": "H02", "tier": "HARD", "goal": "Sharp eyes win.", "code": "public class Main {\n    public static void main(String[] args) {\n        system.out.println(“Sharp eyes win.”);\n    }\n}"}, {"sid": "H03", "tier": "HARD", "goal": "Lowercase and complete.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.Println(\"Lowercase and complete.\")\n    }\n}"}, {"sid": "H04", "tier": "HARD", "goal": "Section: C", "code": "public class Main {\n    public static void main(String[] args) {\n        char section = \"C\";\n        System.out.println(\"Section: \" section);\n    }\n}"}, {"sid": "H05", "tier": "HARD", "goal": "Alpha", "code": "public class Main {\n    public static void main(String[] args) {\n        String team = 'Alpha'\n        System.out.println(team);\n    }\n}"}, {"sid": "H06", "tier": "HARD", "goal": "Ready", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.printIn(Ready);\n    }\n}"}, {"sid": "H07", "tier": "HARD", "goal": "Triple trouble!", "code": "public class Main {\n    public static void main(String[] args) {\n        system.out.println(“Triple trouble!”)\n    }\n}"}, {"sid": "H08", "tier": "HARD", "goal": "Jo is 18 in section B", "code": "public class Main {\n    public static void main(String[] args) {\n        String name = \"Jo\";\n        int age = 18\n        char section = \"B\";\n        System.out.printIn(name + \" is \" + age + \" in section \" + section);\n    }\n}"}, {"sid": "H09", "tier": "HARD", "goal": "90.5", "code": "public class Main {\n    public static void main(String[] args) {\n        int average = 90.5;\n        System.out.Println(average)\n    }\n}"}, {"sid": "H10", "tier": "HARD", "goal": "Name: Leo\nAge: 19", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.print(\"Name: Leo\");\n        System.out.print(\"Age: 19\");\n    }\n}"}, {"sid": "H11", "tier": "HARD", "goal": "Step 1: type\nStep 2: run\nStep 3: fix", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.print(\"Step 1: type\");\n        System.out.print(\"Step 2: run\");\n        System.out.println(\"Step 3: fix\");\n    }\n}"}, {"sid": "H12", "tier": "HARD", "goal": "Age: 20", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Age: \" + 18 + 2);\n    }\n}"}, {"sid": "H13", "tier": "HARD", "goal": "Total: 15", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Total: \" + 10 + 5);\n    }\n}"}, {"sid": "H14", "tier": "HARD", "goal": "Rica", "code": "public class Main {\n    public static void main(String[] args) {\n        String Name = \"Rica\";\n        System.out.println(name);\n    }\n}"}, {"sid": "H15", "tier": "HARD", "goal": "Class names are Capitalized.", "code": "public class main {\n    public static void main(String[] args) {\n        System.out.println(\"Class names are Capitalized.\");\n    }\n}"}, {"sid": "H16", "tier": "HARD", "goal": "Code every day.", "code": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(motto);\n        String motto = \"Code every day.\";\n    }\n}"}, {"sid": "H17", "tier": "HARD", "goal": "90\n95", "code": "public class Main {\n    public static void main(String[] args) {\n        int score = 90;\n        System.out.println(score);\n        int score = 95;\n        System.out.println(score);\n    }\n}"}, {"sid": "H18", "tier": "HARD", "goal": "My grade is 89.75\nKeep it up!", "code": "public class Main {\n    public static void main(String[] args) {\n        double grade = 89.75;\n        System.out.print(\"My grade is \" grade);\n        System.out.print(\"Keep it up!\");\n    }\n}"}, {"sid": "H19", "tier": "HARD", "goal": "Student: Nilo\nYear: 1\nGWA: 1.75", "code": "public class Main {\n    public static void main(String[] args) {\n        String student = \"Nilo\";\n        int year = 1;\n        double gwa = 1.75;\n        System.out.println(\"Student: \" + student);\n        System.out.println(\"Year: \" + year)\n        System.out.println(\"GWA: \" + gwa);\n    }\n}"}, {"sid": "H20", "tier": "HARD", "goal": "Kim / 17\nEnrolled: true", "code": "public class Main {\n    public static void main(String[] args) {\n        String name = \"Kim\"\n        int age = 17;\n        boolean enrolled = True;\n        system.out.println(name + \" / \" + age);\n        System.out.println(\"Enrolled: \" + enrolled);\n    }\n}"}];
+
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+
+let problems = store.get("dd_problems", null) || BUILTIN;
+let used = new Set(store.get("dd_used", []));
+let current = null;
+let lastLoadedText = "";
+
+/* ============================== helpers ============================== */
+const $ = id => document.getElementById(id);
+const pool = tier => problems.filter(p => p.tier === tier && !used.has(p.sid));
+
+function updateCounts(){
+  $("cntE").textContent = pool("EASY").length;
+  $("cntH").textContent = pool("HARD").length;
+  $("btnEasy").disabled = pool("EASY").length === 0;
+  $("btnHard").disabled = pool("HARD").length === 0;
+}
+
+function compose(p){
+  const goal = p.goal.split("\n").map(g => "//     " + g).join("\n");
+  return "package debugduel;\n\n" +
+         "// " + p.sid + " · " + p.tier + "\n" +
+         "// GOAL — make this program print exactly:\n" + goal + "\n\n" +
+         p.code + "\n";
+}
+
+/* ============================== editor ============================== */
+const ta = $("code"), gutter = $("gutter");
+let edSize = 13.5;
+
+function syncGutter(){
+  const n = ta.value.split("\n").length;
+  let s = "";
+  for(let i = 1; i <= n; i++) s += i + "\n";
+  gutter.textContent = s;
+  gutter.scrollTop = ta.scrollTop;
+}
+ta.addEventListener("input", syncGutter);
+ta.addEventListener("scroll", () => { gutter.scrollTop = ta.scrollTop; });
+ta.addEventListener("keydown", e => {
+  if(e.key === "Tab"){
+    e.preventDefault();
+    const s = ta.selectionStart, epos = ta.selectionEnd;
+    ta.value = ta.value.slice(0, s) + "    " + ta.value.slice(epos);
+    ta.selectionStart = ta.selectionEnd = s + 4;
+    syncGutter();
+  }
+});
+
+function setEdFont(){
+  document.documentElement.style.setProperty("--edfont", edSize + "px/1.5 Consolas,Menlo,\"Courier New\",monospace");
+}
+$("fontPlus").onclick = () => { edSize = Math.min(22, edSize + 1); setEdFont(); };
+$("fontMinus").onclick = () => { edSize = Math.max(10, edSize - 1); setEdFont(); };
+
+$("btnCopy").onclick = async () => {
+  const txt = ta.value;
+  let ok = false;
+  try{ await navigator.clipboard.writeText(txt); ok = true; }
+  catch(e){
+    ta.focus(); ta.select();
+    try{ ok = document.execCommand("copy"); }catch(e2){}
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+  const b = $("btnCopy");
+  b.textContent = ok ? "✓ Copied!" : "✗ Select & copy manually";
+  setTimeout(() => { b.textContent = "⧉ Copy all"; }, 1600);
+};
+$("btnClear").onclick = () => {
+  if(ta.value.trim() && !confirm("Clear the editor?")) return;
+  ta.value = ""; syncGutter();
+};
+
+/* ============================== drawing ============================== */
+let rollTimer = null, picked = null;
+
+function startDraw(tier){
+  const av = pool(tier);
+  if(!av.length) return;
+  if(ta.value.trim() && ta.value !== lastLoadedText &&
+     !confirm("The editor has unsaved edits. Draw a new problem anyway?")) return;
+
+  picked = av[Math.floor(Math.random() * av.length)];
+  const m = $("modal"), roll = $("rollSid"), tierEl = $("mTier");
+  tierEl.textContent = "DRAWING " + tier + "…";
+  tierEl.className = "mTier " + tier[0];
+  roll.className = "rolling";
+  $("mGoalWrap").hidden = true; $("mBtns").hidden = true;
+  m.hidden = false;
+
+  const all = problems.filter(p => p.tier === tier).map(p => p.sid);
+  let elapsed = 0, delay = 55;
+  function spin(){
+    roll.textContent = all[Math.floor(Math.random() * all.length)];
+    elapsed += delay;
+    delay = Math.round(delay * 1.13);
+    if(elapsed < 1900){ rollTimer = setTimeout(spin, delay); }
+    else { reveal(); }
+  }
+  spin();
+}
+
+function reveal(){
+  const roll = $("rollSid");
+  roll.textContent = picked.sid;
+  roll.className = "";
+  $("mTier").textContent = picked.sid + "  ·  " + picked.tier +
+      (picked.tier === "EASY" ? "  ·  12 points · 2:00" : "  ·  15 points · 3:00");
+  $("mGoal").textContent = picked.goal;
+  $("mGoalWrap").hidden = false;
+  $("mBtns").hidden = false;
+}
+
+$("btnEasy").onclick = () => startDraw("EASY");
+$("btnHard").onclick = () => startDraw("HARD");
+$("btnCancelDraw").onclick = () => { clearTimeout(rollTimer); $("modal").hidden = true; };
+
+$("btnLoad").onclick = () => {
+  $("modal").hidden = true;
+  current = picked;
+  used.add(current.sid);
+  store.set("dd_used", [...used]);
+  updateCounts();
+
+  ta.value = lastLoadedText = compose(current);
+  syncGutter();
+  ta.scrollTop = 0;
+
+  $("probBadge").textContent = current.sid + " · " + current.tier;
+  $("probBadge").className = "badge " + current.tier[0];
+  $("probGoal").textContent = current.goal;
+  $("probBar").hidden = false;
+
+  setMinutes(current.tier === "HARD" ? 3 : 2);
+};
+
+$("btnResetDraws").onclick = () => {
+  if(!confirm("Reset the drawn-numbers memory? All " + problems.length + " problems become available again.")) return;
+  used = new Set(); store.set("dd_used", []);
+  updateCounts();
+};
+
+/* ============================== import ============================== */
+$("btnImport").onclick = () => { $("importPanel").hidden = !$("importPanel").hidden; };
+$("btnCancelImport").onclick = () => { $("importPanel").hidden = true; };
+
+function parseMaster(text){
+  const lines = text.split(/\r?\n/);
+  const hdr = /^\/\/\s+([EH]\d{2})\s*[·.]\s*(EASY|HARD)/;
+  const bar = /^\/\/\s*=+\s*$/;
+  const out = []; let i = 0;
+  while(i < lines.length){
+    const m = lines[i].match(hdr);
+    if(!m){ i++; continue; }
+    const sid = m[1], tier = m[2];
+    i++;
+    const goal = [];
+    while(i < lines.length && !bar.test(lines[i])){
+      const g = lines[i].match(/^\/\/\s{4,}(.*)$/);
+      if(g) goal.push(g[1]);
+      i++;
+    }
+    if(i < lines.length && bar.test(lines[i])) i++;
+    const code = [];
+    while(i < lines.length && !bar.test(lines[i])){ code.push(lines[i]); i++; }
+    while(code.length && code[code.length - 1].trim() === "") code.pop();
+    while(code.length && code[0].trim() === "") code.shift();
+    if(code.length) out.push({ sid, tier, goal: goal.join("\n"), code: code.join("\n") });
+  }
+  return out;
+}
+
+$("btnLoadImport").onclick = () => {
+  const parsed = parseMaster($("importText").value);
+  const msg = $("importMsg");
+  if(!parsed.length){
+    msg.style.color = "#b3261e";
+    msg.textContent = "No problems found — paste the whole master file, including the // ==== headers.";
+    return;
+  }
+  const e = parsed.filter(p => p.tier === "EASY").length, h = parsed.length - e;
+  if(!confirm("Load " + parsed.length + " problems (" + e + " easy, " + h + " hard)? This replaces the current set and clears drawn numbers.")) return;
+  problems = parsed;
+  used = new Set();
+  store.set("dd_problems", problems);
+  store.set("dd_used", []);
+  msg.style.color = "#1e8e3e";
+  msg.textContent = "Loaded " + parsed.length + " problems ✓ (" + e + " easy, " + h + " hard)";
+  updateCounts();
+};
+
+/* ============================== timer ============================== */
+let totalSec = 120, leftSec = 120, running = false, tickTimer = null, endAt = 0;
+
+function fmt(s){ return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+function paintTime(){
+  const d = $("timeDisp");
+  d.textContent = fmt(Math.max(0, leftSec));
+  d.className = leftSec <= 10 ? "danger" : (leftSec <= 30 ? "warn" : "");
+}
+function setMinutes(min){
+  min = Math.max(1, Math.min(15, Math.round(min)));
+  $("minInput").value = min;
+  stopTick();
+  totalSec = leftSec = min * 60;
+  paintTime();
+}
+function stopTick(){ running = false; clearInterval(tickTimer); $("btnStart").textContent = "▶ Start"; }
+
+function beep(times){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    for(let i = 0; i < times; i++){
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880; o.type = "square";
+      const t = ctx.currentTime + i * 0.35;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      o.start(t); o.stop(t + 0.3);
+    }
+  }catch(e){}
+}
+
+$("btnStart").onclick = () => {
+  if(running) return;
+  if(leftSec <= 0) leftSec = totalSec;
+  running = true;
+  $("btnStart").textContent = "…running";
+  endAt = Date.now() + leftSec * 1000;
+  tickTimer = setInterval(() => {
+    leftSec = Math.round((endAt - Date.now()) / 1000);
+    if(leftSec <= 0){
+      leftSec = 0; paintTime(); stopTick(); beep(3);
+      document.body.style.background = "#fdeaea";
+      setTimeout(() => { document.body.style.background = ""; }, 1200);
+      return;
+    }
+    paintTime();
+  }, 200);
+};
+$("btnPause").onclick = () => { if(running){ stopTick(); } };
+$("btnTReset").onclick = () => { stopTick(); leftSec = totalSec; paintTime(); };
+$("minInput").addEventListener("change", () => setMinutes(parseInt($("minInput").value || "2", 10)));
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => setMinutes(parseInt(c.dataset.min, 10)));
+
+/* ============================== init ============================== */
+updateCounts();
+syncGutter();
+paintTime();
+</script>
+</body>
+</html>
